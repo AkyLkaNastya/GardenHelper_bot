@@ -27,9 +27,6 @@ class PlantNetAPI:
         self.remaining_requests = None
 
     def identify_plant(self, image_path: str, organ: str = 'auto') -> Optional[Dict]:
-        if not image_path:
-            print("Ошибка: не указан путь к изображению")
-            return None
 
         api_endpoint = f"{BASE_URL}/identify/{self.project}?api-key={self.api_key}"
 
@@ -138,7 +135,6 @@ class PlantNetAPI:
         }
 
 def download_image_from_telegram(bot, file_id: str, save_path: str) -> bool:
-    """Скачивает изображение из Telegram"""
     try:
         file_info = bot.get_file(file_id)
         downloaded_file = bot.download_file(file_info.file_path)
@@ -153,7 +149,6 @@ def download_image_from_telegram(bot, file_id: str, save_path: str) -> bool:
 
 
 def cleanup_temp_files(file_paths: List[str]):
-    """Удаляет временные файлы"""
     for file_path in file_paths:
         if os.path.exists(file_path):
             try:

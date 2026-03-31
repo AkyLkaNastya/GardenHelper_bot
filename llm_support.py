@@ -1,6 +1,4 @@
-import os
 import time
-import random
 from dotenv import load_dotenv
 from cerebras.cloud.sdk import Cerebras
 
@@ -49,7 +47,7 @@ class LLMService:
 
     def _generate_cerebras(self, prompt: str, max_tokens: int) -> str:
         if not self.client:
-            print("Cerebras not available, using fallback")
+            print("Cerebras недоступен")
             return None
 
         try:
@@ -69,7 +67,7 @@ class LLMService:
             if completion and completion.choices and completion.choices[0].message:
                 return completion.choices[0].message.content.strip()
             else:
-                print(f"Cerebras error: Empty response")
+                print(f"Cerebras error: Не выдан ответ")
                 return None
 
         except Exception as e:
@@ -163,7 +161,6 @@ class LLMService:
                                 if len(water_parts) > 1:
                                     care_info[current_section]['watering_frequency'] = water_parts[1].strip()
                             else:
-                                # Если нет запятой, пробуем найти слово "раз" в строке
                                 if 'раз' in value:
                                     care_info[current_section]['watering'] = value
                                 else:
@@ -203,13 +200,17 @@ class LLMService:
             return response
 
     def answer_question(self, question: str, user_plants: list = None) -> str:
-        """Отвечает на вопрос пользователя о растениях"""
-
-        if not self._is_available():
-            return ("❌ Модель недоступна. Спросите позже")
+        plants_context = ""
+        if user_plants:
+            plants_names = [plant[0] for plant in user_plants]
+            plants_context = f"\n\nУ пользователя есть следующие растения: {', '.join(plants_names)}.\n"
 
         prompt = f"""
-        Ты - помощник по уходу за растениями. Отвечай кратко и по существу. Используй эмодзи только если уместно
+        Ты - помощник по уходу за растениями. Отвечай кратко и по существу.
+        Используй эмодзи только если уместо.
+        
+        {plants_context}
+    
         Если вопрос не связан с садоводством или растениями то ответь следующее:
         '💔 Кажется, что [вставь тему вопроса] не [связана, связаны, связано и связан] с садоводством. Попробуйте спросить по-другому.'
 
@@ -217,7 +218,6 @@ class LLMService:
         """
 
         response = self.generate(prompt, max_tokens=2000)
-
         return response
 
     def _is_available(self) -> bool:

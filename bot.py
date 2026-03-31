@@ -19,7 +19,7 @@ if not os.path.exists('temp_photos'):
     os.makedirs('temp_photos')
 
 
-def truncate_name(name, max_length=15):
+def truncate_name(name, max_length=20):
     if len(name) <= max_length:
         return name
     return name[:max_length - 1] + "…"
@@ -93,14 +93,6 @@ def process_question(message, question=None):
     """Обрабатывает вопрос пользователя"""
     if not question:
         question = message.text
-
-    if not llm_support.llm.is_gardening_related(question):
-        bot.send_message(
-            message.chat.id,
-            "🤔 Извините, я специализируюсь только на вопросах о растениях и садоводстве. "
-            "Пожалуйста, спросите что-то о растениях, уходе за ними или садоводстве!"
-        )
-        return
 
     user_plants = database.get_user_plants(message.from_user.id)
 
@@ -219,24 +211,6 @@ def get_text_messages(message):
             parse_mode='Markdown',
             reply_markup=markup
         )
-
-
-@bot.callback_query_handler(func=lambda call: call.data.startswith('ask_yes_'))
-def handle_ask_yes(call):
-    question = call.data.replace('ask_yes_', '')
-    bot.answer_callback_query(call.id)
-    bot.delete_message(call.message.chat.id, call.message.message_id)
-    process_question(call.message, question)
-
-
-@bot.callback_query_handler(func=lambda call: call.data == 'ask_no')
-def handle_ask_no(call):
-    bot.answer_callback_query(call.id)
-    bot.delete_message(call.message.chat.id, call.message.message_id)
-    bot.send_message(
-        call.message.chat.id,
-        "Понял! Если возникнут вопросы о растениях, просто нажмите кнопку '❓ Задать вопрос'."
-    )
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('add_'))
@@ -405,36 +379,6 @@ def clear_garden(call):
         bot.answer_callback_query(call.id, "❌ Ошибка при очистке сада")
 
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith('watering_'))
-def save_watering_and_ask_name(call):
-    """Сохраняет дату полива и спрашивает имя"""
-
-    data_without_prefix = call.data.replace('watering_', '')
-    last_underscore_index = data_without_prefix.rfind('_')
-
-    if last_underscore_index == -1:
-        bot.answer_callback_query(call.id, "❌ Ошибка формата данных")
-        return
-
-    choice = data_without_prefix[:last_underscore_index]
-    plant_id = data_without_prefix[last_underscore_index + 1:]
-
-    if not plant_id:
-        bot.answer_callback_query(call.id, "❌ Ошибка")
-        return
-
-    plant_data = temp_plants.get(plant_id)
-
-    if not plant_data:
-        bot.answer_callback_query(call.id, "❌ Данные о растении устарели")
-        return
-
-    bot.delete_message(call.message.chat.id, call.message.message_id)
-
-    ask_for_plant_name(call.from_user.id, plant_id)
-    bot.answer_callback_query(call.id)
-
-
 @bot.callback_query_handler(func=lambda call: call.data.startswith('no_name_'))
 def save_without_name(call):
     """Сохраняет растение без имени"""
@@ -552,13 +496,13 @@ def handle_photo(message):
 
         plant_id = str(uuid.uuid4())
 
-        watering_recommendation = "умеренный"
-        watering_frequency = "1 раз в 3 дня"
+        watering_recommendation = "ошибка"
+        watering_frequency = "ошибка"
         if care_info:
             watering_recommendation = care_info['spring_summer']['watering']
             watering_frequency = care_info['spring_summer']['watering_frequency']
 
-        lighting_recommendation = "рассеянный свет"
+        lighting_recommendation = "ошибка"
         if care_info:
             lighting_recommendation = care_info['spring_summer']['lighting']
 
@@ -637,26 +581,6 @@ def help_command(message):
     )
 
 
-def ask_for_watering_date(user_id, plant_id):
-    markup = types.InlineKeyboardMarkup(row_width=2)
-    buttons = [
-        types.InlineKeyboardButton("Сегодня", callback_data=f"watering_today_{plant_id}"),
-        types.InlineKeyboardButton("Вчера", callback_data=f"watering_yesterday_{plant_id}"),
-        types.InlineKeyboardButton("3-4 дня назад", callback_data=f"watering_3_4_{plant_id}"),
-        types.InlineKeyboardButton("Неделю назад", callback_data=f"watering_week_{plant_id}"),
-        types.InlineKeyboardButton("Прошло больше недели", callback_data=f"watering_more_{plant_id}"),
-        types.InlineKeyboardButton("Не знаю", callback_data=f"watering_unknown_{plant_id}")
-    ]
-    for button in buttons:
-        markup.add(button)
-
-    bot.send_message(
-        user_id,
-        "Когда растение последний раз было полито?",
-        reply_markup=markup
-    )
-
-
 def ask_for_plant_name(user_id, plant_id):
     markup = types.InlineKeyboardMarkup()
     no_button = types.InlineKeyboardButton("Нет", callback_data=f"no_name_{plant_id}")
@@ -672,23 +596,6 @@ def ask_for_plant_name(user_id, plant_id):
         'waiting_for_name': True,
         'plant_id': plant_id
     }
-
-
-def get_watering_date_text(choice):
-    today = datetime.now()
-    if choice == 'today':
-        return today.strftime('%d %B %Y')
-    elif choice == 'yesterday':
-        date = today - timedelta(days=1)
-        return date.strftime('%d %B %Y')
-    elif choice == '3_4':
-        return "3-4 дня назад"
-    elif choice == 'week':
-        return "неделю назад"
-    elif choice == 'more':
-        return "больше недели назад"
-    else:
-        return "неизвестно"
 
 
 def get_next_plant_number(user_id, base_name):
